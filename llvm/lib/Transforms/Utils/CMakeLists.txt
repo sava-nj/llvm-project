@@ -19,6 +19,7 @@ add_llvm_component_library(LLVMTransformUtils
   ControlFlowUtils.cpp
   CtorUtils.cpp
   CountVisits.cpp
+  DebugCountPass.cpp      
   Debugify.cpp
   DemoteRegToStack.cpp
   DXILUpgrade.cpp
