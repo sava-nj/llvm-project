@@ -10,7 +10,7 @@ public:
     PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
 };
 
-} // namespace debugcount
+} // namespace llvm
 
 
 #endif

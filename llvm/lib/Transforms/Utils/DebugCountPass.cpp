@@ -1,39 +1,46 @@
 #include "llvm/Transforms/Utils/DebugCountPass.h"
 #include "llvm/IR/InstIterator.h"  // For instruction iterator
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/DebugProgramInstruction.h"
 
 using namespace llvm;
 
 PreservedAnalyses DebugCounterPass::run(Function &F, FunctionAnalysisManager &AM)
 {
     unsigned dbgDeclareCounter {0}, dbgValueCounter {0}, dbgAssignCounter {0};
+    
+    F.print(errs());
+    errs() << "====================================\n";
 
     for(Instruction &I : instructions(F))
     {
-        if(DbgVariableIntrinsic* DVI = dyn_cast<DbgVariableIntrinsic>(&I)) 
-        // If instruction is not DbgVariableIntrinsic DVI will be nullptr => skip
+        for(DbgRecord &DbgRec : I.getDbgRecordRange())
         {
-            auto id = DVI->getIntrinsicID();
-            if(id == Intrinsic::dbg_declare)
+            errs() << DbgRec << "\n";
+
+            if(auto *DVR = dyn_cast<DbgVariableRecord>(&DbgRec))
             {
-                ++dbgDeclareCounter;
+                if(DVR->isDbgDeclare())
+                {
+                    ++dbgDeclareCounter;
+                }
+                else if(DVR->isDbgValue())
+                {
+                    ++dbgValueCounter;
+                }
+                else if(DVR->isDbgAssign())
+                {
+                    ++dbgAssignCounter;
+                }
             }
-            else if(id == Intrinsic::dbg_value)
-            {
-                ++dbgValueCounter;
-            }
-            else if(id == Intrinsic::dbg_assign)
-            {
-                ++dbgAssignCounter;
-            }
-            
         }
     }
 
-    outs() << "Function: " << F.getName() << "\n";
-    outs() << "\tllvm.dbg.declare: " << dbgDeclareCounter << "\n";
-    outs() << "\tllvm.dbg.value: " << dbgValueCounter << "\n";
-    outs() << "\tllvm.dbg.assign: " << dbgAssignCounter << "\n";
+    errs() << "Function: " << F.getName() << "\n";
+    errs() << "\tllvm.dbg.declare: " << dbgDeclareCounter << "\n";
+    errs() << "\tllvm.dbg.value: " << dbgValueCounter << "\n";
+    errs() << "\tllvm.dbg.assign: " << dbgAssignCounter << "\n";
 
     return PreservedAnalyses::all();
 }
