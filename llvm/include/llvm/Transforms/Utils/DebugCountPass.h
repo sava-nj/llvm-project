@@ -10,6 +10,13 @@ public:
     PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
 };
 
+
+class RemoveDebugRecords : public PassInfoMixin<RemoveDebugRecords> {
+public:
+    PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
+};
+
+
 } // namespace llvm
 
 

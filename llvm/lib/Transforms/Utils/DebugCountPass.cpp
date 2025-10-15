@@ -44,3 +44,31 @@ PreservedAnalyses DebugCounterPass::run(Function &F, FunctionAnalysisManager &AM
 
     return PreservedAnalyses::all();
 }
+
+PreservedAnalyses RemoveDebugRecords::run(Function &F, FunctionAnalysisManager &AM)
+{
+     SmallVector<DbgVariableRecord*, 0> toErase;
+
+    for(Instruction &I : instructions(F))
+    {
+        for(DbgRecord &DbgRec : I.getDbgRecordRange())
+        {
+
+            if(auto *DVR = dyn_cast<DbgVariableRecord>(&DbgRec))
+            {
+                
+                if(DVR->isDbgDeclare() || DVR->isDbgValue() || DVR->isDbgAssign())
+                {
+                    toErase.push_back(DVR);
+                }
+            }
+        }
+    }
+
+    for(DbgVariableRecord* DVR : toErase)
+    {
+        DVR->eraseFromParent();
+    }
+
+    return PreservedAnalyses::all();
+}
