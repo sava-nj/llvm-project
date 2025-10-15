@@ -9,16 +9,11 @@ using namespace llvm;
 PreservedAnalyses DebugCounterPass::run(Function &F, FunctionAnalysisManager &AM)
 {
     unsigned dbgDeclareCounter {0}, dbgValueCounter {0}, dbgAssignCounter {0};
-    
-    F.print(errs());
-    errs() << "====================================\n";
 
     for(Instruction &I : instructions(F))
     {
         for(DbgRecord &DbgRec : I.getDbgRecordRange())
         {
-            errs() << DbgRec << "\n";
-
             if(auto *DVR = dyn_cast<DbgVariableRecord>(&DbgRec))
             {
                 if(DVR->isDbgDeclare())
