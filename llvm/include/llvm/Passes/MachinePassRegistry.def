@@ -172,6 +172,7 @@ MACHINE_FUNCTION_PASS("trigger-verifier-error", TriggerVerifierErrorPass())
 MACHINE_FUNCTION_PASS("two-address-instruction", TwoAddressInstructionPass())
 MACHINE_FUNCTION_PASS("verify", MachineVerifierPass())
 MACHINE_FUNCTION_PASS("verify<machine-trace-metrics>", MachineTraceMetricsVerifierPass())
+MACHINE_FUNCTION_PASS("my-pass", InstructionCounterPass())
 #undef MACHINE_FUNCTION_PASS
 
 #ifndef MACHINE_FUNCTION_PASS_WITH_PARAMS

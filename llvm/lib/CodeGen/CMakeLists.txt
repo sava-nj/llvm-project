@@ -158,6 +158,7 @@ add_llvm_component_library(LLVMCodeGen
   MLRegAllocPriorityAdvisor.cpp
   ModuloSchedule.cpp
   MultiHazardRecognizer.cpp
+  MyFirstMIRPass.cpp    
   PatchableFunction.cpp
   MBFIWrapper.cpp
   MIRPrinter.cpp

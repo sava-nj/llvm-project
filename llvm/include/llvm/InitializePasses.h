@@ -48,6 +48,9 @@ void initializeGlobalISel(PassRegistry &);
 /// Initialize all passes linked into the CodeGen library.
 void initializeTarget(PassRegistry &);
 
+// Initialize my first machine function pass
+void initializeInstructionCounterPass(PassRegistry &);
+
 void initializeAAResultsWrapperPassPass(PassRegistry &);
 void initializeAlwaysInlinerLegacyPassPass(PassRegistry &);
 void initializeAssignmentTrackingAnalysisPass(PassRegistry &);
