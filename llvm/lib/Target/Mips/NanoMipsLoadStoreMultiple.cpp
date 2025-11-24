@@ -162,103 +162,149 @@ bool NMLoadStoreMultipleOpt::isValidNextLoadStore(LSIns Prev, LSIns Next,
 
 bool NMLoadStoreMultipleOpt::generateLoadStoreMultiple(MachineBasicBlock &MBB,
                                                        bool IsLoad, unsigned MaxSeq) {
-  struct Candidate {
-    SmallVector<MachineInstr *> Sequence;
-    bool IsAscending;
-  };
+  using LoadStoreSequence = SmallVector<SmallVector<MachineInstr *>>;     
+  LoadStoreSequence Candidates;           // Vector of potential SW/LW consecutive sequences
+  SmallVector<MachineInstr *> Sequence;   // Sequence of consecutive SW/LW instructions
   bool Modified = false;
-  SmallVector<Candidate> Candidates;
-  SmallVector<MachineInstr *> Sequence;
-  bool IsAscending;
+
+  // Iterate through machine instructions in machine basic block and add consecutive SW/LW to Candidates vector
   for (auto &MI : MBB) {
     // CFI and debug instructions don't break the sequence.
     if (MI.isCFIInstruction() || MI.isDebugInstr())
       continue;
 
     if (isValidLoadStore(MI, IsLoad)) {
-      // Sequences cannot be longer than 8 instructions.
-      if (Sequence.size() == MaxSeq) {
-        Candidates.push_back({Sequence, IsAscending});
-        Sequence.clear();
-      }
-      // When starting a new sequence, there's no need to do any checks.
-      if (Sequence.empty()) {
-        Sequence.push_back(&MI);
-        continue;
-      }
-      bool ShouldStartNewSequence = false;
-      bool IsNextAscending;
-      if (isValidNextLoadStore(Sequence.back(), &MI, IsNextAscending)) {
-        if (Sequence.size() > 1) {
-          // In case the next instruction is going in the opposite direction
-          // from the sequence, start a new sequence.
-          if (IsAscending != IsNextAscending) {
-            ShouldStartNewSequence = true;
+      if (!Sequence.empty()) {
+        // If sequence is not empty check if source registers are same for consecutive SW/LW instructions
+        auto PrevMI = Sequence.back();
+        if (MI.getOperand(1).getReg().id() != PrevMI->getOperand(1).getReg().id()){
+          if (Sequence.size() > 1) {
+            Candidates.push_back(Sequence);
           }
-        } else {
-          IsAscending = IsNextAscending;
+          Sequence.clear();
         }
-      } else {
-        // In case the next instruction is not a valid successor, save the
-        // current sequence (if we have one) and create a new sequence.
-        ShouldStartNewSequence = true;
       }
-
-      if (ShouldStartNewSequence) {
-        if (Sequence.size() > 1)
-          Candidates.push_back({Sequence, IsAscending});
+      Sequence.push_back(&MI);
+    }  
+    else {
+      if (Sequence.size() > 1) {
+        Candidates.push_back(Sequence);
         Sequence.clear();
       }
-
-      Sequence.push_back(&MI);
-      continue;
     }
-
-    // At least 2 instructions are neccessary for a valid sequence.
-    if (Sequence.size() > 1)
-      Candidates.push_back({Sequence, IsAscending});
-
-    // Sequence has either ended or has never been started.
-    if (!Sequence.empty())
-      Sequence.clear();
   }
 
-  // Make sure that the last sequence has been added to the Candidates list.
-  if (Sequence.size() > 1)
-    Candidates.push_back({Sequence, IsAscending});
-
-  // Separate sequence to avoid removing instructions from MBB while iterating.
-  for (auto &C : Candidates) {
-    auto &Seq = C.Sequence;
-
-    assert(Seq.size() > 1 && Seq.size() < 9);
-
-    auto *Base = C.IsAscending ? Seq.front() : Seq.back();
-    int64_t Offset = Base->getOperand(2).getImm();
-    // Sequence cannot be merged, if the offset is out of range.
-    if (!isInt<9>(Offset))
-      continue;
-
-    auto InsertBefore = std::next(MBBIter(Base));
-    unsigned Opcode = IsLoad ? Mips::LWM_NM : Mips::SWM_NM;
-    auto BMI =
-        BuildMI(MBB, InsertBefore, Base->getDebugLoc(), TII->get(Opcode))
-            .addReg(Base->getOperand(0).getReg(), IsLoad ? RegState::Define : 0)
-            .addReg(Base->getOperand(1).getReg())
-            .addImm(Offset)
-            .addImm(Seq.size());
-    BMI.cloneMergedMemRefs(Seq);
-    for (auto *MI : Seq) {
-      if (MI != Base)
-        BMI.addReg(MI->getOperand(0).getReg(),
-                   IsLoad ? RegState::ImplicitDefine : RegState::Implicit);
-      MBB.erase(MI);
+  // Candidates consist of potential SW/LW consecutive instructions. 
+  // TODO: Check max.size, check target registers, check offset for sequences.
+  for (auto &Seq : Candidates) {
+    errs() << " --- SEQ --- \n";
+    for (auto &MI : Seq) {
+      MI->dump();
     }
-
-    Modified = true;
+    errs() << "\n";
   }
+
   return Modified;
 }
+
+
+//   struct Candidate {
+//     SmallVector<MachineInstr *> Sequence;
+//     bool IsAscending;
+//   };
+//   bool Modified = false;
+//   SmallVector<Candidate> Candidates;
+//   SmallVector<MachineInstr *> Sequence;
+//   bool IsAscending;
+//   for (auto &MI : MBB) {
+//     // CFI and debug instructions don't break the sequence.
+//     if (MI.isCFIInstruction() || MI.isDebugInstr())
+//       continue;
+
+//     if (isValidLoadStore(MI, IsLoad)) {
+//       // Sequences cannot be longer than 8 instructions.
+//       if (Sequence.size() == MaxSeq) {
+//         Candidates.push_back({Sequence, IsAscending});
+//         Sequence.clear();
+//       }
+//       // When starting a new sequence, there's no need to do any checks.
+//       if (Sequence.empty()) {
+//         Sequence.push_back(&MI);
+//         continue;
+//       }
+//       bool ShouldStartNewSequence = false;
+//       bool IsNextAscending;
+//       if (isValidNextLoadStore(Sequence.back(), &MI, IsNextAscending)) {
+//         if (Sequence.size() > 1) {
+//           // In case the next instruction is going in the opposite direction
+//           // from the sequence, start a new sequence.
+//           if (IsAscending != IsNextAscending) {
+//             ShouldStartNewSequence = true;
+//           }
+//         } else {
+//           IsAscending = IsNextAscending;
+//         }
+//       } else {
+//         // In case the next instruction is not a valid successor, save the
+//         // current sequence (if we have one) and create a new sequence.
+//         ShouldStartNewSequence = true;
+//       }
+
+//       if (ShouldStartNewSequence) {
+//         if (Sequence.size() > 1)
+//           Candidates.push_back({Sequence, IsAscending});
+//         Sequence.clear();
+//       }
+
+//       Sequence.push_back(&MI);
+//       continue;
+//     }
+
+//     // At least 2 instructions are neccessary for a valid sequence.
+//     if (Sequence.size() > 1)
+//       Candidates.push_back({Sequence, IsAscending});
+
+//     // Sequence has either ended or has never been started.
+//     if (!Sequence.empty())
+//       Sequence.clear();
+//   }
+
+//   // Make sure that the last sequence has been added to the Candidates list.
+//   if (Sequence.size() > 1)
+//     Candidates.push_back({Sequence, IsAscending});
+
+//   // Separate sequence to avoid removing instructions from MBB while iterating.
+//   for (auto &C : Candidates) {
+//     auto &Seq = C.Sequence;
+
+//     assert(Seq.size() > 1 && Seq.size() < 9);
+
+//     auto *Base = C.IsAscending ? Seq.front() : Seq.back();
+//     int64_t Offset = Base->getOperand(2).getImm();
+//     // Sequence cannot be merged, if the offset is out of range.
+//     if (!isInt<9>(Offset))
+//       continue;
+
+//     auto InsertBefore = std::next(MBBIter(Base));
+//     unsigned Opcode = IsLoad ? Mips::LWM_NM : Mips::SWM_NM;
+//     auto BMI =
+//         BuildMI(MBB, InsertBefore, Base->getDebugLoc(), TII->get(Opcode))
+//             .addReg(Base->getOperand(0).getReg(), IsLoad ? RegState::Define : 0)
+//             .addReg(Base->getOperand(1).getReg())
+//             .addImm(Offset)
+//             .addImm(Seq.size());
+//     BMI.cloneMergedMemRefs(Seq);
+//     for (auto *MI : Seq) {
+//       if (MI != Base)
+//         BMI.addReg(MI->getOperand(0).getReg(),
+//                    IsLoad ? RegState::ImplicitDefine : RegState::Implicit);
+//       MBB.erase(MI);
+//     }
+
+//     Modified = true;
+//   }
+//   return Modified;
+// }
 
 INITIALIZE_PASS(NMLoadStoreMultipleOpt, DEBUG_TYPE, NM_LOAD_STORE_OPT_NAME,
                 false, false)
