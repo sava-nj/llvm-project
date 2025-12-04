@@ -179,6 +179,8 @@ bool NMLoadStoreMultipleOpt::generateLoadStoreMultiple(MachineBasicBlock &MBB,
     // Sort machine instructions in each candidate vector based on offset.
     sortCandidatesBasedOnOffset(Candidate);
 
+    if(!isInt<9>(Candidate.front()->getOperand(2).getImm()))
+      continue;
     /* Print sorted sequences: */
     // errs() << "\n--- SEQ --- \n";
     // for (auto &MI : Candidate) {
@@ -192,8 +194,6 @@ bool NMLoadStoreMultipleOpt::generateLoadStoreMultiple(MachineBasicBlock &MBB,
       int64_t CurrentOffset = Current->getOperand(2).getImm();
       unsigned CurrentRtNo = getRegNo(Current->getOperand(0).getReg().id());
       
-      if (!isInt<9>(CurrentOffset))
-        continue;
 
       MachineInstr *Next = (idx + 1 < Candidate.size()) ? Candidate[idx + 1] : nullptr;
       if (Next) {
